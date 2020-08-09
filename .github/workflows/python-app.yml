@@ -1,0 +1,49 @@
+name: test
+
+on:
+  push:
+    branches:
+      - test-branch
+  pull_request:
+    branches:
+      - test-branch
+
+jobs:
+  build:
+
+    runs-on: ubuntu-16.04
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 2.7
+
+    - name: Install requirements
+      run: |
+        sudo apt-get update -y
+        pip install diff_cover==0.9.9 pylint==1.7.6
+
+    - name: Load report from file
+      id: get-report-finding
+      run: |
+        body=$(cat CHANGELOG.md)
+        body="${body//'%'/'%25'}"
+        body="${body//$'\n'/'%0A'}"
+        body="${body//$'\r'/'%0D'}"
+        echo ::set-output name=body::$body
+
+    - name: Post comment on PR
+      uses: unsplash/comment-on-pr@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        msg: ${{ steps.get-report-finding.outputs.body }}
+        check_for_duplicate_msg: false  # OPTIONAL
+
+    - name: Analysing the code with pylint
+      run: |
+        git fetch origin dev:refs/remotes/origin/dev
+        diff-quality --violations=pylint --compare-branch=origin/dev --html-report report.html --fail-under=100
